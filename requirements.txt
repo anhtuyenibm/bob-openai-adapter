@@ -1,0 +1,24 @@
+# Bob OpenAI Adapter Requirements
+
+## Python Dependencies
+# This adapter uses only Python standard library.
+# No pip packages required!
+#
+# Python version: 3.7+
+
+## External Requirements
+
+# Bob Shell must be installed and available in PATH
+# For Bob Shell installation instructions, refer to IBM's Bob Shell documentation
+#
+# Verify Bob installation with: bob --version
+
+## Installation
+
+# 1. Install Bob Shell (follow IBM's official documentation)
+# 2. Copy bob_openai_adapter.py to your project
+# 3. Start using the adapter!
+
+## Development
+# For running tests and examples:
+# - No additional packages needed
