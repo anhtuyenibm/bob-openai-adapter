@@ -1,33 +1,48 @@
 # Bob OpenAI Adapter
 
-A lightweight Python adapter that exposes Bob Shell through an OpenAI-style chat-completions interface.
+A small Python adapter that lets plain-text Bob Shell calls use an OpenAI-style chat-completions call pattern.
 
-The adapter is intended for simple plain-text integrations that already use a pattern similar to:
+The adapter is intended for code that already uses a simple pattern like:
 
 ```python
 client.chat.completions.create(...)
 ```
 
-It accepts selected OpenAI-style parameters for caller compatibility. Parameters that Bob Shell does not support, such as `temperature` and `max_tokens`, are accepted but logged and ignored.
+It is not a full OpenAI SDK implementation. It supports a practical subset of chat-completion behavior and keeps Bob-specific limitations explicit.
 
-## Scope
+## Repository
 
-This project currently supports a practical subset of chat-completions behavior:
+<https://github.com/anhtuyenibm/bob-openai-adapter>
 
-- plain text chat messages
+## What it supports
+
+- `BobOpenAI` client object
 - `client.chat.completions.create(...)`
+- plain-text `system`, `user`, and `assistant` messages
 - response access through `response.choices[0].message.content`
+- `to_dict()`, `model_dump()`, and `to_json()` response helpers
 - configurable timeout and retry settings
-- Bob-specific options such as `chat_mode` and `approval_mode`
-- optional additional Bob CLI arguments through `extra_args`
+- Bob options such as `chat_mode`, `approval_mode`, and `extra_args`
 - optional working directory through `cwd`
+- optional streaming-shaped response objects
 
-It is not a full implementation of the OpenAI Python SDK. Advanced features such as tools/function calling, multimodal content, async APIs, embeddings, and exact SDK object parity are outside the current scope.
+## What it does not support
+
+The adapter currently does not implement:
+
+- full OpenAI SDK object parity
+- tools or function calling
+- multimodal message content
+- async APIs
+- embeddings, fine-tuning, or other non-chat APIs
+- true real-time streaming from the Bob process
+
+OpenAI-style parameters such as `temperature`, `max_tokens`, and `top_p` are accepted for caller compatibility, but Bob Shell does not use them through this adapter.
 
 ## Prerequisites
 
-- Python 3.7+
-- Bob Shell installed and available on `PATH`
+- Python 3.8+
+- Bob Shell installed separately and available on `PATH`, unless `bob_command` points to a specific executable
 
 Check Bob availability:
 
@@ -35,7 +50,25 @@ Check Bob availability:
 bob --version
 ```
 
-## Basic Usage
+## Installation
+
+Install from the repository:
+
+```bash
+python3 -m pip install "git+https://github.com/anhtuyenibm/bob-openai-adapter.git"
+```
+
+For development from a local checkout:
+
+```bash
+git clone https://github.com/anhtuyenibm/bob-openai-adapter.git
+cd bob-openai-adapter
+python3 -m pip install -e ".[dev]"
+```
+
+See [INSTALLATION.md](INSTALLATION.md) for more installation options.
+
+## Basic usage
 
 ```python
 import os
@@ -46,13 +79,15 @@ client = BobOpenAI(api_key=os.getenv("BOBSHELL_API_KEY"))
 response = client.chat.completions.create(
     model="bob",
     messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "system", "content": "You are a concise assistant."},
+        {"role": "user", "content": "Explain what a Python list is."},
     ],
 )
 
 print(response.choices[0].message.content)
 ```
+
+`api_key` is accepted for compatibility with callers that expect an API-key field. Bob Shell authentication is handled by the local Bob Shell setup.
 
 ## Configuration
 
@@ -69,55 +104,36 @@ client = BobOpenAI(
 )
 ```
 
-`api_key` is accepted for compatibility with callers that already expect an API-key field. Bob Shell authentication is handled by Bob Shell itself unless future Bob versions require otherwise.
-
-## Chat Completion Parameters
-
-Supported or accepted parameters include:
+## Common parameters
 
 | Parameter | Behavior |
 |---|---|
-| `messages` | Converted into a text prompt and sent to Bob stdin |
-| `model` | Passed to Bob as `-m` unless the value is `"bob"` |
-| `stream` | Returns an iterator of chunk objects after Bob output is available |
-| `chat_mode` | Passed to Bob as `--chat-mode` |
-| `approval_mode` | Passed to Bob as `--approval-mode` |
+| `messages` | Converted into a plain-text prompt and sent to Bob stdin |
+| `model` | Passed to Bob with `-m` when the value is not `"bob"` |
+| `chat_mode` | Passed to Bob with `--chat-mode` |
+| `approval_mode` | Passed to Bob with `--approval-mode` |
 | `extra_args` | Appended to the Bob CLI command |
-| `temperature`, `max_tokens`, `top_p`, etc. | Accepted, logged, and ignored |
+| `stream` | Returns chunk-shaped response objects after Bob output is available |
+| `temperature`, `max_tokens`, `top_p`, etc. | Accepted for compatibility and ignored |
 
-## Streaming Note
-
-The current implementation invokes Bob with `subprocess.run(...)`, so output is collected after Bob exits. The `stream=True` path exposes an iterator of chunks for API-shape compatibility, but it is not true real-time streaming.
-
-## Examples
-
-### Bob chat mode
-
-```python
-response = client.chat.completions.create(
-    model="bob",
-    messages=[{"role": "user", "content": "Write a small Python function."}],
-    chat_mode="code",
-)
-```
-
-### Additional Bob arguments
+Example with Bob-specific options:
 
 ```python
 response = client.chat.completions.create(
     model="bob",
     messages=[{"role": "user", "content": "Review this workspace."}],
     chat_mode="advanced",
+    approval_mode="yolo",
     extra_args=["--include-directories", "/path/to/project"],
 )
 ```
 
-### Streaming-shaped response
+## Streaming-shaped responses
 
 ```python
 stream = client.chat.completions.create(
     model="bob",
-    messages=[{"role": "user", "content": "Explain the code."}],
+    messages=[{"role": "user", "content": "Explain this code."}],
     stream=True,
 )
 
@@ -127,7 +143,9 @@ for chunk in stream:
         print(content, end="", flush=True)
 ```
 
-## Error Handling
+The current implementation invokes Bob with `subprocess.run(...)`. Output is collected after Bob exits. The streaming path provides chunk-shaped objects for simple compatibility, not true live streaming.
+
+## Error handling
 
 ```python
 from bob_openai_adapter import BobAPIError, BobConnectionError, BobError, BobTimeoutError
@@ -147,42 +165,20 @@ except BobError as exc:
     print(f"Adapter error: {exc}")
 ```
 
-
 ## Tests
 
-Run the unit tests with:
+Run the unit tests:
 
 ```bash
-python test_adapter.py
+python3 -m pytest -q
 ```
 
-These tests use temporary fake Bob executables and do not require a live Bob installation.
+The unit tests use temporary fake Bob executables and do not require a live Bob installation.
 
-To run the optional real-Bob smoke test, use:
+Optional real-Bob smoke test:
 
 ```bash
-RUN_REAL_BOB_TESTS=1 python test_real_bob_version.py
+RUN_REAL_BOB_TESTS=1 python3 examples/test_real_bob_version.py
 ```
 
-That test only calls `bob -v`. It verifies that the Bob executable is available and returns version/help text; it does not send a prompt and does not require `BOBSHELL_API_KEY`. To use a non-default executable path, set `BOB_COMMAND`:
-
-```bash
-RUN_REAL_BOB_TESTS=1 BOB_COMMAND=/path/to/bob python test_real_bob_version.py
-```
-
-## Limitations
-
-- The adapter targets simple chat-completion integrations, not complete SDK compatibility.
-- OpenAI sampling parameters are accepted but not applied.
-- Streaming is chunk-shaped output after process completion, not real-time process streaming.
-- Retries should be configured carefully because Bob may perform tool or file-system actions depending on mode and configuration.
-- Token usage is estimated from whitespace-separated words.
-
-## Files
-
-- `bob_openai_adapter.py` — core adapter implementation
-- `examples.py` — usage examples
-- `simple_example.py` — minimal runnable example
-- `test_adapter.py` — tests using a temporary fake Bob command
-- `QUICKSTART.md` — short usage guide
-- `INSTALLATION.md` — installation notes
+That smoke test only calls `bob -v`. It does not send a prompt and does not require `BOBSHELL_API_KEY`.

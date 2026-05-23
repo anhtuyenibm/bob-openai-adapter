@@ -3,7 +3,7 @@
 Simple example demonstrating Bob OpenAI Adapter usage.
 
 Run this file to see the adapter in action:
-    python simple_example.py
+    python examples/simple_example.py
 """
 
 import os
@@ -77,7 +77,7 @@ def main():
     print("\nNext steps:")
     print("- Check examples.py for more advanced usage")
     print("- Read README.md for full documentation")
-    print("- Run test_adapter.py to test the adapter")
+    print("- Run python -m pytest -q to test the adapter")
 
 if __name__ == "__main__":
     try:

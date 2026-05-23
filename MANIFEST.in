@@ -1,9 +1,5 @@
 include README.md
-include LICENSE
 include INSTALLATION.md
-include QUICKSTART.md
-include PROJECT_SUMMARY.md
-include ABSTRACT.md
+include LICENSE
 recursive-include examples *.py
-recursive-include docs *
 recursive-include tests *.py

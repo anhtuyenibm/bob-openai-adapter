@@ -4,7 +4,7 @@ Tests for Bob OpenAI Adapter.
 The tests use temporary fake Bob executables so they do not require a live Bob
 installation. Run with:
 
-    python test_adapter.py
+    python -m pytest -q
 """
 
 from __future__ import annotations
