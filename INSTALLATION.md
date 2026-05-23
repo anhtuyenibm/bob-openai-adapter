@@ -1,55 +1,62 @@
-# Installation Guide
+# Installation
 
-## Requirements
+This project is packaged as a normal Python package. The import name remains:
 
-- Python 3.7 or newer
-- Bob Shell installed separately
+```python
+from bob_openai_adapter import BobOpenAI
+```
 
-Verify Bob Shell:
+## Local editable install
+
+From the repository root:
+
+```bash
+python3 -m pip install -e .
+```
+
+For development tools:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+## Install from a Git repository
+
+After the project is committed to GitHub/GitHub Enterprise:
+
+```bash
+python3 -m pip install "git+ssh://git@github.ibm.com/<org>/bob-openai-adapter.git"
+```
+
+or, for a specific branch:
+
+```bash
+python3 -m pip install "git+ssh://git@github.ibm.com/<org>/bob-openai-adapter.git@main"
+```
+
+## Build a distributable wheel
+
+```bash
+python3 -m pip install build
+python3 -m build
+```
+
+This creates files under `dist/`, for example:
+
+```text
+dist/bob_openai_adapter-0.1.0-py3-none-any.whl
+```
+
+Users can install that wheel directly:
+
+```bash
+python3 -m pip install dist/bob_openai_adapter-0.1.0-py3-none-any.whl
+```
+
+## Runtime requirement
+
+Bob Shell must be installed separately and available through `bob` on `PATH`, unless callers pass a custom `bob_command`.
 
 ```bash
 bob --version
 ```
-
-## Install by Copying the Module
-
-```bash
-cp bob_openai_adapter.py /path/to/your/project/
-```
-
-Then import it:
-
-```python
-from bob_openai_adapter import BobOpenAI
-```
-
-## Optional Environment Variable
-
-The client accepts `BOBSHELL_API_KEY` for compatibility with code that expects an API-key-style constructor argument:
-
-```bash
-export BOBSHELL_API_KEY="..."
-```
-
-The current adapter stores this value but does not pass it to Bob Shell. Bob Shell authentication remains the responsibility of the Bob Shell environment.
-
-## Minimal Smoke Test
-
-```python
-from bob_openai_adapter import BobOpenAI
-
-client = BobOpenAI()
-response = client.chat.completions.create(
-    model="bob",
-    messages=[{"role": "user", "content": "Hello"}],
-)
-print(response.choices[0].message.content)
-```
-
-## Local Tests
-
-```bash
-python test_adapter.py
-```
-
-The tests use a fake Bob command created at runtime, so they can validate adapter behavior without calling a live Bob installation.

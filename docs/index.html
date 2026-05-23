@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bob OpenAI Adapter - OpenAI-compatible interface for Bob Shell</title>
+    <title>Bob OpenAI Adapter - OpenAI-style interface for Bob Shell</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,11 +29,11 @@
     <section class="hero">
         <div class="container">
             <h1 class="hero-title">
-                <span class="highlight">OpenAI-compatible</span><br>
+                <span class="highlight">OpenAI-style</span><br>
                 interface for IBM Bob Shell
             </h1>
             <p class="hero-subtitle">
-                Drop-in replacement for OpenAI's chat API. Use <a href="https://bob.ibm.com/docs/shell" target="_blank" style="color: #60a5fa; text-decoration: underline;">IBM Bob Shell</a> with your existing OpenAI code - just change two lines.
+                A small adapter for using <a href="https://bob.ibm.com/docs/shell" target="_blank" style="color: #60a5fa; text-decoration: underline;">IBM Bob Shell</a> from code that already follows the OpenAI chat-completions pattern.
             </p>
             <div class="hero-buttons">
                 <a href="#quick-start" class="btn btn-primary">Get started</a>
@@ -45,7 +45,7 @@
                 </a>
             </div>
             <div class="install-command">
-                <code>$ curl -O https://raw.githubusercontent.com/anhtuyenibm/bob-openai-adapter/main/bob_openai_adapter.py</code>
+                <code>$ python3 -m pip install .</code>
             </div>
         </div>
     </section>
@@ -54,14 +54,14 @@
         <div class="container">
             <div class="feature-grid">
                 <div class="feature-card problem">
-                    <div class="feature-label">THE CHALLENGE</div>
-                    <h3>Switching between APIs is tedious</h3>
-                    <p>You have code using OpenAI's API. You want to try Bob Shell. Rewriting the integration layer takes time and introduces bugs.</p>
+                    <div class="feature-label">MOTIVATION</div>
+                    <h3>Reducing integration-specific code</h3>
+                    <p>Some tools already use a chat-completions call pattern. This adapter provides a small compatibility layer for Bob Shell for those simple text-based cases.</p>
                 </div>
                 <div class="feature-card solution">
-                    <div class="feature-label">THE SOLUTION</div>
-                    <h3>Change two lines, keep everything else</h3>
-                    <p>The adapter mimics OpenAI's interface. Your existing code works with Bob - just swap the import and client initialization.</p>
+                    <div class="feature-label">APPROACH</div>
+                    <h3>Keep the common call shape</h3>
+                    <p>The adapter supports a practical subset of the chat-completions interface and wraps Bob Shell subprocess calls behind that interface.</p>
                 </div>
             </div>
         </div>
@@ -69,7 +69,7 @@
 
     <section id="quick-start" class="demo">
         <div class="container">
-            <h2>See it in action</h2>
+            <h2>Basic usage</h2>
             <div class="code-demo">
                 <div class="code-header">
                     <span class="dot red"></span>
@@ -85,7 +85,7 @@ client = OpenAI(api_key=os.getenv(<span class="string">"OPENAI_API_KEY"</span>))
 <span class="keyword">from</span> bob_openai_adapter <span class="keyword">import</span> BobOpenAI <span class="keyword">as</span> OpenAI
 client = OpenAI(api_key=os.getenv(<span class="string">"BOBSHELL_API_KEY"</span>))
 
-<span class="comment"># Everything else stays the same</span>
+<span class="comment"># Common chat-completion usage can remain similar</span>
 response = client.chat.completions.create(
     model=<span class="string">"bob"</span>,
     messages=[
@@ -107,12 +107,12 @@ response = client.chat.completions.create(
                 <div class="step">
                     <div class="step-number">1</div>
                     <h3>Install</h3>
-                    <p>Copy the adapter file to your project. No pip dependencies - uses only Python standard library.</p>
+                    <p>Install the package locally or from the repository using pip.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">2</div>
                     <h3>Import</h3>
-                    <p>Replace your OpenAI import with the Bob adapter. The interface is identical.</p>
+                    <p>Use the Bob adapter client where your code expects the supported chat-completions subset.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">3</div>
@@ -122,12 +122,12 @@ response = client.chat.completions.create(
                 <div class="step">
                     <div class="step-number">4</div>
                     <h3>Run</h3>
-                    <p>Your code calls IBM Bob Shell through the adapter. Messages are formatted, Bob executes, responses are wrapped.</p>
+                    <p>The adapter formats messages, invokes Bob Shell, and wraps the output in a chat-completion-style response object.</p>
                 </div>
                 <div class="step">
                     <div class="step-number">5</div>
                     <h3>Iterate</h3>
-                    <p>Switch between OpenAI and IBM Bob by changing one line. Test both, compare results, choose what works.</p>
+                    <p>Use the adapter where Bob is the desired backend, and keep unsupported API differences documented.</p>
                 </div>
             </div>
         </div>
@@ -140,8 +140,8 @@ response = client.chat.completions.create(
                 <div class="feature-item">
                     <div class="feature-icon">✓</div>
                     <div>
-                        <h4>OpenAI-compatible interface</h4>
-                        <p>Same methods, same response structure, same message format</p>
+                        <h4>OpenAI-style interface</h4>
+                        <p>Common chat-completions call shape and response access pattern</p>
                     </div>
                 </div>
                 <div class="feature-item">
@@ -168,14 +168,14 @@ response = client.chat.completions.create(
                 <div class="feature-item">
                     <div class="feature-icon">✓</div>
                     <div>
-                        <h4>Zero dependencies</h4>
-                        <p>Uses only Python standard library - no pip install needed</p>
+                        <h4>Small dependency footprint</h4>
+                        <p>Runtime implementation uses the Python standard library</p>
                     </div>
                 </div>
                 <div class="feature-item">
                     <div class="feature-icon">✓</div>
                     <div>
-                        <h4>Comprehensive error handling</h4>
+                        <h4>Error handling</h4>
                         <p>Specific exceptions for timeouts, API errors, and connection failures</p>
                     </div>
                 </div>
@@ -185,8 +185,8 @@ response = client.chat.completions.create(
 
     <section class="cta">
         <div class="container">
-            <h2>Ready to get started?</h2>
-            <p>Copy the adapter to your project and start using IBM Bob Shell with your OpenAI code.</p>
+            <h2>Getting started</h2>
+            <p>Install the package and use it for supported plain-text Bob Shell chat-completion calls.</p>
             <div class="cta-buttons">
                 <a href="https://github.com/anhtuyenibm/bob-openai-adapter" class="btn btn-primary">View on GitHub</a>
                 <a href="https://github.com/anhtuyenibm/bob-openai-adapter/blob/main/README.md" class="btn btn-secondary">Read the docs</a>

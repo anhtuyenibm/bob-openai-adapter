@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This project provides a small Python adapter that lets simple OpenAI-style chat-completion callers invoke Bob Shell through a familiar interface.
+This project provides a small Python adapter that lets simple chat-completion-style callers invoke Bob Shell through a familiar interface.
 
 The main goal is to reduce application-level changes for code that already uses a pattern such as:
 
@@ -94,7 +94,7 @@ python test_adapter.py
 
 ## Summary
 
-The current package is a compact OpenAI-style wrapper for simple Bob Shell chat calls. It is suitable as a starting point for internal integrations that need plain text chat-completion behavior, with clear boundaries around features that are not implemented yet.
+The current package is a compact wrapper for simple Bob Shell chat calls. It is suitable as a starting point for internal integrations that need plain-text chat-completion behavior, with clear boundaries around features that are not implemented yet.
 
 
 ## Optional Real-Bob Smoke Test

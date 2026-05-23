@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Bob OpenAI Adapter is a small Python module that exposes Bob Shell through an OpenAI-style chat-completions interface.
+The Bob OpenAI Adapter is a small Python module that exposes Bob Shell through a chat-completions-style interface.
 
 It is designed for applications that already use simple chat-completion calls and want to route those calls to Bob Shell with minimal application-level changes.
 

@@ -21,6 +21,8 @@ from typing import Any, Dict, Iterator, List, Literal, Optional, Union
 
 logger = logging.getLogger(__name__)
 
+__version__ = "0.1.0"
+
 
 class BobError(Exception):
     """Base exception for Bob adapter errors."""
