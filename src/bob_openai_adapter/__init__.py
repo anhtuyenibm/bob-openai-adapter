@@ -48,7 +48,7 @@ class BobConnectionError(BobError):
 
 class TransportConfig:
     """Configuration for transport layer (retry, timeout, etc.)."""
-    
+
     def __init__(
         self,
         timeout: float = 300.0,
@@ -56,18 +56,16 @@ class TransportConfig:
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
         max_retry_delay: float = 60.0,
-        cwd: Optional[str] = None,
     ):
         """
         Initialize transport configuration.
-        
+
         Args:
             timeout: Request timeout in seconds (default: 300)
             max_retries: Maximum number of retry attempts (default: 3)
             retry_delay: Initial delay between retries in seconds (default: 1.0)
             retry_backoff: Backoff multiplier for retry delay (default: 2.0)
             max_retry_delay: Maximum retry delay in seconds (default: 60.0)
-            cwd: Working directory for the Bob subprocess
         """
         self.timeout = timeout
         self.max_retries = max_retries
@@ -202,7 +200,7 @@ class ChatCompletionChunk:
 
 class BobExecutor:
     """Handles execution of Bob commands with retry logic."""
-    
+
     def __init__(
         self,
         command: str = "bob",
@@ -212,47 +210,108 @@ class BobExecutor:
         self.command = command
         self.transport_config = transport_config or TransportConfig()
         self.cwd = cwd
-    
+        self._bob_major: int = self._detect_bob_version()
+
+    # ── Version detection ─────────────────────────────────────────────────────
+
+    def _detect_bob_version(self) -> int:
+        """
+        Run ``bob --version`` once and return the major version as an int.
+
+        Bob v1 outputs a bare integer string (e.g. ``1.0.4``).
+        Bob v2 is expected to output a string starting with ``2``.
+
+        Returns 1 on any failure (e.g. Bob not installed yet, used only in
+        tests with a fake executable that lacks --version) so that the legacy
+        CLI shape is used as the safe default.
+        """
+        try:
+            proc = subprocess.run(
+                [self.command, "--version"],
+                text=True,
+                capture_output=True,
+                timeout=10,
+                env=os.environ.copy(),
+                cwd=self.cwd,
+                check=False,
+            )
+            raw = (proc.stdout or proc.stderr or "").strip()
+            # Accept "2", "2.0", "2.0.0", "v2.1.3", etc.
+            first_token = raw.lstrip("vV").split()[0] if raw else "1"
+            major = int(first_token.split(".")[0])
+            logger.debug("Detected Bob major version: %d (raw: %r)", major, raw)
+            return major
+        except Exception as exc:
+            logger.debug("Could not detect Bob version (%s) — assuming v1.", exc)
+            return 1
+
+    # ── Command construction ──────────────────────────────────────────────────
+
     def _build_command(
         self,
+        prompt: str,
         chat_mode: Optional[str] = None,
         model: Optional[str] = None,
         output_format: str = "text",
         approval_mode: str = "yolo",
         extra_args: Optional[List[str]] = None,
     ) -> List[str]:
-        """Build the Bob command with arguments."""
-        cmd = [self.command]
-        
-        # Add approval mode
-        cmd.extend(["--approval-mode", approval_mode])
-        
-        # Add chat mode if specified
-        if chat_mode:
-            cmd.extend(["--chat-mode", chat_mode])
-        
-        # Add model if specified
-        if model:
-            cmd.extend(["-m", model])
-        
-        # Add output format
-        cmd.extend(["-o", output_format])
-        
-        # Add any extra arguments
-        if extra_args:
-            cmd.extend(extra_args)
-        
+        """
+        Build the Bob CLI invocation for the detected major version.
+
+        v1 shape:  bob --approval-mode <m> [--chat-mode <c>] [-m <model>]
+                       -o <format> [extra…]
+                   prompt delivered via stdin
+
+        v2 shape:  bob run --format json [--mode <c>] [extra…] <prompt>
+                   approval-mode and -m flags removed in v2;
+                   prompt is a positional argument.
+                   output_format is always forced to "json" so the response
+                   can be parsed reliably (last_message field).
+        """
+        if self._bob_major >= 2:
+            # v2: subcommand + --format json + positional prompt
+            # approval_mode and model are silently dropped — v2 removed them.
+            bob_format = "json" if output_format == "text" else output_format
+            cmd = [self.command, "run", "--format", bob_format]
+            if chat_mode:
+                cmd.extend(["--mode", chat_mode])
+            if extra_args:
+                cmd.extend(extra_args)
+            cmd.append(prompt)
+        else:
+            # v1: flags then prompt via stdin (prompt not in cmd here)
+            cmd = [self.command]
+            cmd.extend(["--approval-mode", approval_mode])
+            if chat_mode:
+                cmd.extend(["--chat-mode", chat_mode])
+            if model:
+                cmd.extend(["-m", model])
+            cmd.extend(["-o", output_format])
+            if extra_args:
+                cmd.extend(extra_args)
         return cmd
-    
+
+    # ── Execution + retry ─────────────────────────────────────────────────────
+
     def _execute_with_retry(
         self,
         cmd: List[str],
         prompt: str,
+        output_format: str,
     ) -> str:
-        """Execute command with retry logic."""
+        """
+        Execute *cmd* with retry logic and return the answer text.
+
+        v1: passes prompt via stdin; stdout is plain text (output_format=text)
+            or raw format string for other formats.
+        v2: prompt is already baked into cmd as a positional arg; stdout is
+            JSON; for output_format=="text" the answer is extracted from the
+            ``last_message`` field.
+        """
         last_exception = None
         retry_delay = self.transport_config.retry_delay
-        
+
         for attempt in range(self.transport_config.max_retries + 1):
             try:
                 logger.debug(
@@ -261,21 +320,25 @@ class BobExecutor:
                     self.transport_config.max_retries + 1,
                     " ".join(shlex.quote(part) for part in cmd),
                 )
-                
-                proc = subprocess.run(
-                    cmd,
-                    input=prompt,
+
+                run_kwargs: dict = dict(
                     text=True,
+                    encoding="utf-8",
                     capture_output=True,
                     timeout=self.transport_config.timeout,
                     env=os.environ.copy(),
                     cwd=self.cwd,
                     check=False,
                 )
-                
+                # v1 receives the prompt on stdin; v2 has it as a positional arg.
+                if self._bob_major < 2:
+                    run_kwargs["input"] = prompt
+
+                proc = subprocess.run(cmd, **run_kwargs)
+
                 stdout = (proc.stdout or "").strip()
                 stderr = (proc.stderr or "").strip()
-                
+
                 if proc.returncode != 0:
                     detail = stderr or stdout or "<no output>"
                     if len(detail) > 2000:
@@ -284,33 +347,48 @@ class BobExecutor:
                         f"Bob exited with code {proc.returncode}: {detail}",
                         status_code=proc.returncode,
                     )
-                
+
                 if not stdout:
                     detail = stderr or "<no stderr>"
                     raise BobAPIError(f"Bob returned empty output. stderr: {detail}")
-                
+
+                # v2 always returns JSON; extract last_message for text mode.
+                if self._bob_major >= 2 and output_format == "text":
+                    try:
+                        payload = json.loads(stdout)
+                    except json.JSONDecodeError as exc:
+                        raise BobAPIError(
+                            f"Bob v2 returned invalid JSON: {exc}"
+                        ) from exc
+                    result = payload.get("last_message")
+                    if not isinstance(result, str) or not result.strip():
+                        raise BobAPIError(
+                            "Bob v2 JSON response did not contain a non-empty last_message"
+                        )
+                    return result.strip()
+
                 return stdout
-                
+
             except FileNotFoundError as exc:
                 raise BobConnectionError(
                     f"Bob executable not found: {self.command!r}. "
                     "Make sure Bob is installed and available on PATH."
                 ) from exc
-            
-            except subprocess.TimeoutExpired as exc:
+
+            except subprocess.TimeoutExpired:
                 last_exception = BobTimeoutError(
                     f"Bob timed out after {self.transport_config.timeout} second(s)."
                 )
                 logger.warning("Bob timeout on attempt %d: %s", attempt + 1, last_exception)
-            
+
             except BobAPIError as exc:
                 last_exception = exc
                 logger.warning("Bob API error on attempt %d: %s", attempt + 1, exc)
-            
+
             except Exception as exc:
                 last_exception = BobError(f"Failed to execute Bob: {exc}")
                 logger.warning("Bob execution error on attempt %d: %s", attempt + 1, exc)
-            
+
             # Don't retry if this was the last attempt
             if attempt < self.transport_config.max_retries:
                 logger.info("Retrying in %.2f seconds...", retry_delay)
@@ -319,10 +397,10 @@ class BobExecutor:
                     retry_delay * self.transport_config.retry_backoff,
                     self.transport_config.max_retry_delay,
                 )
-        
+
         # All retries exhausted
         raise last_exception or BobError("Unknown error during Bob execution")
-    
+
     def execute(
         self,
         prompt: str,
@@ -332,15 +410,16 @@ class BobExecutor:
         approval_mode: str = "yolo",
         extra_args: Optional[List[str]] = None,
     ) -> str:
-        """Execute Bob command and return output."""
+        """Execute Bob command and return the answer text."""
         cmd = self._build_command(
+            prompt=prompt,
             chat_mode=chat_mode,
             model=model,
             output_format=output_format,
             approval_mode=approval_mode,
             extra_args=extra_args,
         )
-        return self._execute_with_retry(cmd, prompt)
+        return self._execute_with_retry(cmd, prompt, output_format)
 
 
 class Completions:
