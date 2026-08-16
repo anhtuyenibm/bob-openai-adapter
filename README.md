@@ -52,21 +52,22 @@ bob --version
 
 ## Installation
 
-Install from the repository:
+Install from the repository using SSH (no credential prompt):
 
 ```bash
-python3 -m pip install "git+https://github.com/anhtuyenibm/bob-openai-adapter.git"
+python3 -m pip install "git+ssh://git@github.com/anhtuyenibm/bob-openai-adapter.git"
 ```
+
+This uses your machine's SSH key — the same one used for `git clone`. Ensure
+your key is added to your GitHub account before running this command.
 
 For development from a local checkout:
 
 ```bash
-git clone https://github.com/anhtuyenibm/bob-openai-adapter.git
+git clone git@github.com:anhtuyenibm/bob-openai-adapter.git
 cd bob-openai-adapter
 python3 -m pip install -e ".[dev]"
 ```
-
-See [INSTALLATION.md](INSTALLATION.md) for more installation options.
 
 ## Basic usage
 
